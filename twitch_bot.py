@@ -15,6 +15,7 @@ STREAMERS = [
     "gothamchess",
     "vei",
     "sodapoppin",
+    "summit1g",
 ]
 
 STATE_FILE = "live_state.txt"
@@ -69,13 +70,12 @@ def main():
       game = stream.get("game_name", "Unknown Category")
       stream_url = f"https://twitch.tv/{name}"
 
-      # Twitch thumbnail template: replace {width} and {height} with actual dimensions
       thumbnail_template = stream.get("thumbnail_url", "")
       image_url = thumbnail_template.replace("{width}", "1280").replace(
           "{height}", "720"
       )
 
-      # Build Discord Embed Payload
+      # Discord Embed Payload
       payload = {
           "embeds": [{
               "title": title,
