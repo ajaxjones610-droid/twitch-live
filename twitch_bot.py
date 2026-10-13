@@ -5,7 +5,7 @@ CLIENT_ID = os.environ.get("TWITCH_CLIENT_ID")
 CLIENT_SECRET = os.environ.get("TWITCH_CLIENT_SECRET")
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 
-# List of streamers to track based on their Twitch profile URLs
+# List of streamers to track
 STREAMERS = [
     "bajiru_en",
     "novaaokami",
@@ -17,7 +17,6 @@ STREAMERS = [
     "sodapoppin",
 ]
 
-# File to remember who is currently live between GitHub Actions runs
 STATE_FILE = "live_state.txt"
 
 
@@ -41,7 +40,6 @@ def main():
   token = get_app_token()
   headers = {"Client-ID": CLIENT_ID, "Authorization": f"Bearer {token}"}
 
-  # Twitch API allows checking multiple usernames at once using query parameters
   params = [("user_login", s) for s in STREAMERS]
 
   response = requests.get(
@@ -51,11 +49,10 @@ def main():
     print(f"Failed to fetch streams: {response.text}")
     return
 
-  # Grab anyone currently live from the API response
   live_data = response.json().get("data", [])
   current_live = {stream["user_name"].lower() for stream in live_data}
 
-  # Load previous live state from file
+  # Load previous live state
   previously_live = set()
   if os.path.exists(STATE_FILE):
     with open(STATE_FILE, "r") as f:
@@ -63,24 +60,41 @@ def main():
           line.strip().lower() for line in f if line.strip()
       )
 
-  # Find streamers who just went live (they are live now, but weren't last time)
   newly_live = current_live - previously_live
 
   for stream in live_data:
     name = stream["user_name"]
     if name.lower() in newly_live:
-      title = stream.get("title", "")
-      game = stream.get("game_name", "")
-      payload = {
-          "content": (
-              f"🔴 **{name}** is now live playing **{game}**!\nTitle: {title}\n"
-              f"🔗 https://twitch.tv/{name}"
-          )
-      }
-      requests.post(WEBHOOK_URL, json=payload)
-      print(f"Notification sent for {name}")
+      title = stream.get("title", "No Title")
+      game = stream.get("game_name", "Unknown Category")
+      stream_url = f"https://twitch.tv/{name}"
 
-  # Save the current live state back to the file for the next 5-minute check
+      # Twitch thumbnail template: replace {width} and {height} with actual dimensions
+      thumbnail_template = stream.get("thumbnail_url", "")
+      image_url = thumbnail_template.replace("{width}", "1280").replace(
+          "{height}", "720"
+      )
+
+      # Build Discord Embed Payload
+      payload = {
+          "embeds": [{
+              "title": title,
+              "url": stream_url,
+              "color": 9520895,  # Twitch Purple (Hex #9146FF)
+              "author": {"name": f"🔴 {name} is now LIVE!"},
+              "fields": [{
+                  "name": "Playing",
+                  "value": game,
+                  "inline": True,
+              }],
+              "image": {"url": image_url},
+          }]
+      }
+
+      requests.post(WEBHOOK_URL, json=payload)
+      print(f"Notification sent with preview image for {name}")
+
+  # Save current live state
   with open(STATE_FILE, "w") as f:
     for name in current_live:
       f.write(f"{name}\n")
