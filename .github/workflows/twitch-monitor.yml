@@ -2,9 +2,13 @@ name: Twitch Live Monitor
 
 on:
   schedule:
-    # Runs every 5 minutes. Adjust if you want it more or less frequent.
+    # Runs every 5 minutes
     - cron: '*/5 * * * *'
   workflow_dispatch:
+
+# GRANT WRITE PERMISSIONS FOR AUTOMATIC COMMITS
+permissions:
+  contents: write
 
 jobs:
   check:
