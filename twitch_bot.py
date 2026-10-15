@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import os
 import requests
 
@@ -31,6 +32,29 @@ def get_app_token():
       },
   ).json()
   return res.get("access_token")
+
+
+def calculate_uptime(started_at_str):
+  """Calculates stream uptime from Twitch's started_at ISO timestamp."""
+  if not started_at_str:
+    return "Just started"
+  try:
+    # Twitch API returns UTC time like '2026-10-15T02:30:00Z'
+    start_time = datetime.fromisoformat(
+        started_at_str.replace("Z", "+00:00")
+    )
+    now = datetime.now(timezone.utc)
+    duration = now - start_time
+
+    total_seconds = int(duration.total_seconds())
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+
+    if hours > 0:
+      return f"{hours}h {minutes}m"
+    return f"{minutes}m"
+  except Exception:
+    return "Just started"
 
 
 def main():
@@ -68,6 +92,8 @@ def main():
     if name.lower() in newly_live:
       title = stream.get("title", "No Title")
       game = stream.get("game_name", "Unknown Category")
+      started_at = stream.get("started_at", "")
+      uptime = calculate_uptime(started_at)
       stream_url = f"https://twitch.tv/{name}"
 
       thumbnail_template = stream.get("thumbnail_url", "")
@@ -75,24 +101,27 @@ def main():
           "{height}", "720"
       )
 
-      # Discord Embed Payload
+      # Build Payload:
+      # 'content' is outside the embed (shows up on phone notifications)
       payload = {
+          "content": f"🔴 **{name}** is live on Twitch!",
           "embeds": [{
               "title": title,
               "url": stream_url,
-              "color": 9520895,  # Twitch Purple (Hex #9146FF)
-              "author": {"name": f"🔴 {name} is now LIVE!"},
-              "fields": [{
-                  "name": "Playing",
-                  "value": game,
-                  "inline": True,
-              }],
+              "color": 9520895,  # Twitch Purple
+              "author": {"name": f"{name} is now LIVE!"},
+              "fields": [
+                  {"name": "Playing", "value": game, "inline": True},
+                  {"name": "Uptime", "value": uptime, "inline": True},
+              ],
               "image": {"url": image_url},
-          }]
+          }],
       }
 
       requests.post(WEBHOOK_URL, json=payload)
-      print(f"Notification sent with preview image for {name}")
+      print(
+          f"Notification sent for {name} (Uptime: {uptime}) with thumbnail"
+      )
 
   # Save current live state
   with open(STATE_FILE, "w") as f:
