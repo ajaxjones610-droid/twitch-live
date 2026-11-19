@@ -1,5 +1,4 @@
 name: Twitch Live Monitor
-name: Twitch Live Monitor
 
 on:
   workflow_dispatch:
